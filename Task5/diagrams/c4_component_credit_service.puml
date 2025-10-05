@@ -1,0 +1,145 @@
+@startuml c4_component_credit_service
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Диаграмма компонентов - Credit Application Service
+
+' Styling
+skinparam backgroundcolor #FEFEFE
+LAYOUT_WITH_LEGEND()
+
+' External containers
+Container(api_gateway, "API Gateway", "Kong/nginx", "Маршрутизация и авторизация")
+Container(quick_scoring, "Quick Scoring Adapter", "Java Spring Boot", "Быстрый скоринг")
+Container(credit_gateway, "Credit Pipeline Gateway", "Java Spring Boot", "Интеграция с конвейером")
+Container(preapproval_service, "Pre-approval Service", "Python/Java", "Сервис предодобрений")
+ContainerDb(redis_cache, "Redis Cache", "Redis Cluster", "Кэш предложений")
+ContainerDb(credit_db, "Credit Database", "PostgreSQL", "База заявок")
+ContainerQueue(rabbitmq, "Message Queue", "RabbitMQ", "Очередь событий")
+Container(abs, "АБС", "Delphi/Oracle", "Банковская система")
+
+' Credit Application Service boundary
+Container_Boundary(credit_service, "Credit Application Service") {
+
+    ' API Layer
+    Component(rest_controller, "REST Controller", "Spring REST", "HTTP endpoints для заявок")
+    Component(websocket_controller, "WebSocket Controller", "Spring WebSocket", "Real-time статусы")
+    Component(auth_filter, "Auth Filter", "Spring Security", "Проверка JWT токенов")
+    Component(rate_limiter, "Rate Limiter", "Bucket4j", "Ограничение частоты запросов")
+
+    ' Business Logic Layer
+    Component(application_manager, "Application Manager", "Spring Service", "Управление жизненным циклом заявок")
+    Component(validation_engine, "Validation Engine", "Spring Service", "Валидация данных заявки")
+    Component(status_tracker, "Status Tracker", "Spring Service", "Отслеживание статусов")
+    Component(priority_calculator, "Priority Calculator", "Spring Service", "Расчет приоритета заявки")
+    Component(offer_matcher, "Offer Matcher", "Spring Service", "Сопоставление с предодобрениями")
+
+    ' Integration Layer
+    Component(scoring_adapter, "Scoring Adapter", "REST Client", "Интеграция со скорингом")
+    Component(pipeline_adapter, "Pipeline Adapter", "REST Client", "Интеграция с конвейером")
+    Component(abs_adapter, "ABS Adapter", "REST Client", "Интеграция с АБС")
+    Component(cache_adapter, "Cache Adapter", "Redis Client", "Работа с кэшем")
+
+    ' Event Layer
+    Component(event_publisher, "Event Publisher", "Spring AMQP", "Публикация событий")
+    Component(event_listener, "Event Listener", "Spring AMQP", "Обработка событий")
+    Component(event_store, "Event Store", "Spring Data", "Хранение истории событий")
+
+    ' Data Access Layer
+    Component(application_repository, "Application Repository", "Spring Data JPA", "CRUD операции с заявками")
+    Component(audit_repository, "Audit Repository", "Spring Data JPA", "Сохранение аудита")
+
+    ' Cache Management
+    Component(cache_manager, "Cache Manager", "Spring Cache", "Управление кэшированием")
+    Component(cache_warmer, "Cache Warmer", "Spring Scheduler", "Прогрев кэша")
+    Component(cache_invalidator, "Cache Invalidator", "Spring Service", "Инвалидация кэша")
+}
+
+' External interactions with API Gateway
+Rel(api_gateway, rest_controller, "Передает запросы", "REST/JSON")
+Rel(api_gateway, websocket_controller, "WebSocket соединения", "WS")
+
+' API Layer interactions
+Rel(rest_controller, auth_filter, "Проверка токена", "")
+Rel(rest_controller, rate_limiter, "Проверка лимитов", "")
+Rel(rest_controller, application_manager, "Делегирует обработку", "")
+Rel(websocket_controller, status_tracker, "Подписка на статусы", "")
+
+' Business Logic interactions
+Rel(application_manager, validation_engine, "Валидирует данные", "")
+Rel(application_manager, priority_calculator, "Рассчитывает приоритет", "")
+Rel(application_manager, offer_matcher, "Проверяет предодобрения", "")
+Rel(application_manager, status_tracker, "Обновляет статус", "")
+Rel(application_manager, application_repository, "Сохраняет заявку", "")
+
+' Status tracking
+Rel(status_tracker, event_publisher, "Публикует изменения", "")
+Rel(status_tracker, event_store, "Сохраняет события", "")
+
+' Offer matching
+Rel(offer_matcher, cache_adapter, "Ищет предложения", "")
+
+' Integration adapters
+Rel(application_manager, scoring_adapter, "Запрашивает скоринг", "")
+Rel(application_manager, pipeline_adapter, "Передает в конвейер", "")
+Rel(application_manager, abs_adapter, "Получает данные клиента", "")
+
+' External integrations
+Rel(scoring_adapter, quick_scoring, "REST API", "HTTP/JSON")
+Rel(pipeline_adapter, credit_gateway, "REST API", "HTTP/JSON")
+Rel(abs_adapter, abs, "REST API", "HTTP/JSON")
+
+' Cache operations
+Rel(cache_adapter, cache_manager, "Использует", "")
+Rel(cache_manager, redis_cache, "Читает/Пишет", "Redis protocol")
+Rel(cache_warmer, cache_manager, "Прогревает", "")
+Rel(cache_invalidator, cache_manager, "Очищает", "")
+Rel(cache_warmer, preapproval_service, "Загружает предложения", "REST API")
+
+' Event handling
+Rel(event_publisher, rabbitmq, "Публикует", "AMQP")
+Rel(rabbitmq, event_listener, "Доставляет", "AMQP")
+Rel(event_listener, status_tracker, "Обновляет статусы", "")
+Rel(event_store, credit_db, "Сохраняет", "JDBC")
+
+' Data persistence
+Rel(application_repository, credit_db, "CRUD операции", "JDBC")
+Rel(audit_repository, credit_db, "Сохраняет аудит", "JDBC")
+
+' Notes
+note right of application_manager
+  **Основная логика:**
+  • Создание заявки
+  • Проверка дубликатов
+  • Workflow управление
+  • Бизнес-правила
+  • Оркестрация
+end note
+
+note bottom of event_publisher
+  **События:**
+  • ApplicationCreated
+  • StatusChanged
+  • ScoringCompleted
+  • ApprovalReceived
+  • DocumentsSigned
+end note
+
+note left of cache_manager
+  **Стратегии кэширования:**
+  • Write-through для заявок
+  • Cache-aside для предложений
+  • TTL 24h для скоринга
+  • Invalidate on update
+end note
+
+note right of priority_calculator
+  **Факторы приоритета:**
+  • Предодобренная заявка: +10
+  • VIP клиент: +5
+  • Сумма > 1М руб: +3
+  • Повторная заявка: -2
+end note
+
+SHOW_LEGEND()
+
+@enduml
