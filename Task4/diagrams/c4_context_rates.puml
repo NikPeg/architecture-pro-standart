@@ -1,0 +1,37 @@
+@startuml c4_context_rates
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title Контекстная диаграмма - Система передачи ставок в кол-центры
+
+Person(backoffice_manager, "Менеджер бэк-офиса", "Управляет депозитными ставками")
+Person(cc_operator, "Оператор кол-центра", "Консультирует клиентов по ставкам")
+Person(partner_operator, "Оператор партнера", "Консультирует клиентов партнерского кол-центра")
+Person(customer, "Клиент", "Звонит для консультации по депозитам")
+
+System_Boundary(bank_boundary, "Банк Стандарт") {
+    System(rate_system, "Система управления ставками", "Централизованное управление и распространение депозитных ставок")
+    System(cc_system, "Система кол-центра", "CRM система собственного кол-центра")
+    System(abs, "АБС", "Хранение и расчет ставок")
+    System(sftp_gateway, "SFTP Gateway", "Безопасная передача файлов партнерам")
+}
+
+System_Ext(partner_cc, "Партнерский кол-центр", "Внешняя система партнера")
+System_Ext(cbr, "Центральный банк", "Источник ключевой ставки")
+
+' Взаимодействия людей
+Rel(backoffice_manager, rate_system, "Обновляет ставки", "Web UI")
+Rel(cc_operator, cc_system, "Просматривает ставки", "Web UI")
+Rel(partner_operator, partner_cc, "Использует импортированные ставки", "Internal UI")
+Rel(customer, cc_operator, "Звонит за консультацией")
+Rel(customer, partner_operator, "Переадресованный звонок")
+
+' Системные взаимодействия
+Rel(rate_system, abs, "Сохраняет и читает ставки", "PL/SQL")
+Rel(rate_system, cc_system, "Передает актуальные ставки", "REST API / Events")
+Rel(rate_system, sftp_gateway, "Загружает файлы со ставками", "SFTP")
+Rel(partner_cc, sftp_gateway, "Скачивает файлы со ставками", "SFTP")
+Rel(abs, cbr, "Получает ключевую ставку", "REST API")
+
+SHOW_LEGEND()
+
+@enduml
