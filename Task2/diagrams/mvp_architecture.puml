@@ -1,0 +1,101 @@
+@startuml mvp_architecture
+!theme plain
+title Архитектура MVP - Депозиты и Кредиты
+skinparam backgroundColor #FEFEFE
+
+' External Users
+actor "Новый клиент" as NEW_CLIENT
+actor "Существующий\nклиент" as CLIENT
+actor "Менеджер\nотделения" as BRANCH_MGR
+actor "Менеджер\nбэк-офиса" as BACK_OFFICE
+actor "Оператор\nкол-центра" as CC_OPER
+
+' Frontend Layer
+package "Frontend Layer" #E6F3FF {
+  [Сайт банка\n(PHP/React.js)] as SITE #90EE90
+  [Интернет-банк\n(ASP.NET MVC 4.5)] as IB #90EE90
+}
+
+' API Gateway / Integration Layer
+package "Integration Layer (NEW)" #FFE6E6 {
+  [API Gateway\n(nginx/Kong)] as API_GW #FF6B6B
+  [Кэш справочников\n(Redis)] as CACHE #FFA500
+  [Очередь сообщений\n(RabbitMQ/Kafka*)] as QUEUE #FFA500
+  note right of QUEUE : *Kafka на перспективу\nRabbitMQ для MVP
+}
+
+' Business Logic Layer
+package "Business Services" #F0E6FF {
+  [Сервис депозитов\n(NEW - Java/C#)] as DEPOSIT_SVC #DDA0DD
+  [Сервис кредитов\n(NEW - Java/C#)] as CREDIT_SVC #DDA0DD
+  [Сервис ставок\n(NEW - в АБС)] as RATE_SVC #DDA0DD
+  [Сервис уведомлений\n(NEW - Java)] as NOTIFY_SVC #DDA0DD
+}
+
+' Existing Systems
+package "Core Banking Systems" #E6FFE6 {
+  [АБС\n(Delphi/Oracle)] as ABS #98FB98
+  database "Oracle DB\n(АБС)" as ABS_DB #D3D3D3
+  [Кредитный конвейер\n(Camunda/Java)] as PIPELINE #98FB98
+  database "Oracle DB\n(Конвейер)" as PIPELINE_DB #D3D3D3
+}
+
+package "Support Systems" #FFFACD {
+  [Система кол-центра\n(React/Java/PostgreSQL)] as CC_SYS #FFD700
+  [Система скоринга\n(Python/Flask)] as SCORING #FFD700
+  [СМС-шлюз] as SMS #FFD700
+}
+
+' External Systems
+cloud "Внешние системы" #F0F0F0 {
+  [Бюро кредитных\nисторий] as BKI #FFE6CC
+}
+
+' User interactions
+NEW_CLIENT --> SITE : Заявка
+CLIENT --> IB : Заявка
+BRANCH_MGR --> ABS : Обработка
+BACK_OFFICE --> ABS : Управление\nставками
+CC_OPER --> CC_SYS : Обработка\nзаявок
+
+' Frontend to API Gateway
+SITE --> API_GW : HTTPS/TLS
+IB --> API_GW : HTTPS/TLS
+
+' API Gateway to Services
+API_GW --> DEPOSIT_SVC : REST
+API_GW --> CREDIT_SVC : REST
+API_GW --> CACHE : Чтение
+
+' Services interactions
+DEPOSIT_SVC --> RATE_SVC : Запрос ставок
+DEPOSIT_SVC --> QUEUE : Событие заявки
+CREDIT_SVC --> SCORING : REST API
+CREDIT_SVC --> QUEUE : Событие заявки
+RATE_SVC --> ABS_DB : Чтение/Запись
+NOTIFY_SVC --> QUEUE : Подписка
+NOTIFY_SVC --> SMS : Отправка СМС
+
+' Existing integrations
+CC_SYS --> QUEUE : События
+ABS --> ABS_DB : Работа
+PIPELINE --> PIPELINE_DB : Работа
+SCORING --> BKI : REST API
+
+' Batch processes
+ABS_DB ..> PIPELINE_DB : Batch\n(1 раз/день)
+PIPELINE_DB ..> ABS_DB : Batch\n(1 раз/день)
+
+' Cache updates
+RATE_SVC --> CACHE : Обновление
+
+note bottom
+  **Ключевые изменения MVP:**
+  • API Gateway для защиты АБС от прямых запросов
+  • Кэширование справочников (решение проблемы производительности)
+  • Очередь сообщений для асинхронной обработки
+  • Микросервисы для новой функциональности
+  • Сервис ставок в АБС вместо Excel
+end note
+
+@enduml

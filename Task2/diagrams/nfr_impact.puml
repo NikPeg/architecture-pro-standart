@@ -1,0 +1,101 @@
+@startuml nfr_impact
+!theme plain
+title Влияние нефункциональных требований на архитектуру MVP
+skinparam backgroundColor #FEFEFE
+
+' Define NFR categories
+package "Надежность (Reliability)" #FFE6E6 {
+  rectangle "SLA 99.9%\nдоступности" as R1 #FF9999
+  rectangle "Работа 24/7" as R2 #FF9999
+  rectangle "Переключение\nна резервный ЦОД" as R3 #FF9999
+  rectangle "RTO < 1 час\nRPO < 15 мин" as R4 #FF9999
+}
+
+package "Производительность (Performance)" #E6FFE6 {
+  rectangle "Отклик\n< 100ms" as P1 #99FF99
+  rectangle "Загрузка страниц\n< 2 сек" as P2 #99FF99
+  rectangle "1000+ одновременных\nпользователей" as P3 #99FF99
+  rectangle "Обработка заявок\nв тот же день" as P4 #99FF99
+}
+
+package "Ограничения (Restrictions)" #FFE6FF {
+  rectangle "Не нагружать\nАБС напрямую" as C1 #FF99FF
+  rectangle "Использовать\nOracle/MS SQL" as C2 #FF99FF
+  rectangle "Batch интеграция\n1 раз/день" as C3 #FF99FF
+  rectangle "Вертикальное\nмасштабирование АБС" as C4 #FF99FF
+}
+
+package "Безопасность (Security)" #FFFACD {
+  rectangle "Шифрование\nтрафика (TLS)" as S1 #FFD700
+  rectangle "СМС-подтверждение\nопераций" as S2 #FFD700
+  rectangle "Аудит всех\nопераций" as S3 #FFD700
+}
+
+' Define architectural solutions
+package "Архитектурные решения" #E6F3FF {
+  component "API Gateway\n+ Load Balancer" as APIGW #87CEEB
+  component "Redis Cache\nКэширование" as CACHE #87CEEB
+  component "Message Queue\nRabbitMQ/Kafka" as QUEUE #87CEEB
+  component "Микросервисы\nJava/C#" as MICRO #87CEEB
+  component "Multi-ЦОД\nразвертывание" as MULTI #87CEEB
+  component "Circuit Breaker\nPattern" as CB #87CEEB
+  component "Event Sourcing\n+ CQRS" as ES #87CEEB
+  component "Monitoring\nELK Stack" as MON #87CEEB
+}
+
+' Draw relationships
+R1 --> MULTI : требует
+R1 --> CB : требует
+R2 --> MULTI : требует
+R3 --> MULTI : реализует
+R4 --> ES : обеспечивает
+
+P1 --> CACHE : решение
+P2 --> CACHE : решение
+P3 --> APIGW : обеспечивает
+P4 --> QUEUE : ускоряет
+
+C1 --> APIGW : защищает
+C1 --> QUEUE : буферизует
+C3 --> QUEUE : компенсирует
+C4 --> CACHE : компенсирует
+
+S1 --> APIGW : реализует
+S2 ..> MICRO : использует
+S3 --> ES : обеспечивает
+S3 --> MON : логирует
+
+' Add notes
+note right of APIGW
+  **API Gateway обеспечивает:**
+  • Единая точка входа
+  • Балансировка нагрузки
+  • Rate limiting
+  • TLS termination
+  • Аутентификация
+end note
+
+note right of CACHE
+  **Кэширование решает:**
+  • Медленная загрузка справочников
+  • Снижение нагрузки на АБС
+  • Быстрый отклик < 100ms
+end note
+
+note right of QUEUE
+  **Очереди обеспечивают:**
+  • Асинхронная обработка
+  • Буферизация нагрузки
+  • Гарантированная доставка
+  • Компенсация batch-процессов
+end note
+
+note bottom
+  **Критические NFR для MVP:**
+  1. SLA 99.9% - определяет необходимость резервирования
+  2. Защита АБС от перегрузки - требует промежуточного слоя
+  3. Производительность < 100ms - требует кэширования
+  4. Batch-ограничения - требуют альтернативных решений
+end note
+
+@enduml
