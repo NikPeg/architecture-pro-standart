@@ -1,0 +1,103 @@
+@startuml integration_schema
+!theme plain
+title Схема интеграции приложений банка "Стандарт"
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+
+' External Systems
+package "Внешние системы" #F0F0F0 {
+  [Бюро кредитных историй] as BKI #FFE6CC
+  [Телеком-оператор\n(СМС)] as TELCO #FFE6CC
+  [Партнёрский\nкол-центр] as PARTNER_CC #FFE6CC
+}
+
+' Front-office Systems
+package "Фронт-офисные системы" #E6F3FF {
+  [Сайт\nPHP/React.js] as SITE #90EE90
+  [Интернет-банк\nASP.NET MVC\nMS SQL] as IB #90EE90
+  [Система кол-центра\nReact.js/Java/PostgreSQL] as CC #87CEEB
+  database "MS SQL" as IB_DB #D3D3D3
+  database "PostgreSQL" as CC_DB #D3D3D3
+}
+
+' Core Banking
+package "Core Banking" #FFE6E6 {
+  [АБС\nDelphi/Oracle] as ABS #FF6B6B
+  database "Oracle DB\n(АБС)" as ABS_DB #D3D3D3
+  [СМС-шлюз] as SMS #FFA500
+}
+
+' Back-office Systems
+package "Бэк-офисные системы" #F0E6FF {
+  [Кредитный конвейер\nCamunda BPM/Java] as CREDIT_PIPELINE #DDA0DD
+  [Система скоринга\nPython/Flask] as SCORING #DDA0DD
+  database "Oracle DB\n(Конвейер)" as PIPELINE_DB #D3D3D3
+  database "PostgreSQL\n(Скоринг)" as SCORING_DB #D3D3D3
+}
+
+' Manual Processes
+package "Ручные процессы" #FFFACD {
+  [Excel расчеты\nставок] as EXCEL #FFD700
+  [Email\nкоммуникации] as EMAIL #FFD700
+}
+
+' Connections - Real-time
+IB --> IB_DB : "Хранение"
+IB --> ABS_DB : "Прямое\nподключение\n(real-time)" #green
+CC --> CC_DB : "Хранение"
+CC --> ABS : "API\n(real-time)" #green
+ABS --> ABS_DB : "Хранение"
+ABS --> SMS : "События" #green
+SMS --> TELCO : "API\n(real-time)" #green
+CREDIT_PIPELINE --> PIPELINE_DB : "Хранение"
+SCORING --> SCORING_DB : "Хранение"
+
+' Connections - Batch
+ABS_DB ..> CREDIT_PIPELINE : "Batch\n(1 раз/день)" #red
+CREDIT_PIPELINE ..> ABS_DB : "Batch\n(1 раз/день)" #red
+ABS_DB ..> SCORING_DB : "Batch\n(1 раз/день)" #red
+PIPELINE_DB ..> SCORING_DB : "Batch\n(1 раз/день)" #red
+
+' Connections - API
+CREDIT_PIPELINE --> SCORING : "REST API\n(real-time)" #green
+SCORING --> BKI : "REST API\n(real-time)" #green
+
+' Manual connections
+EMAIL -.-> ABS : "Ручная\nобработка" #orange
+EXCEL -.-> EMAIL : "Передача\nрасчетов" #orange
+PARTNER_CC -.-> EMAIL : "Скрипты\nзвонков" #orange
+
+' Actors
+actor "Клиент" as CLIENT
+actor "Сотрудник\nотделения" as BRANCH_EMP
+actor "Сотрудник\nбэк-офиса" as BACK_EMP
+actor "Менеджер\nкредитования" as CREDIT_MGR
+actor "Оператор\nкол-центра" as CC_OPER
+
+CLIENT --> SITE : "Просмотр"
+CLIENT --> IB : "Платежи,\nсчета"
+CLIENT --> BRANCH_EMP : "Визит"
+CLIENT --> CC_OPER : "Звонок"
+BRANCH_EMP --> ABS : "Работа"
+BACK_EMP --> ABS : "Обработка"
+BACK_EMP --> EXCEL : "Расчеты"
+CREDIT_MGR --> CREDIT_PIPELINE : "Обработка\nзаявок"
+CC_OPER --> CC : "Обращения"
+
+note right of EXCEL
+  **Проблемы:**
+  • Batch-интеграции (задержки 24ч)
+  • Прямой доступ к БД
+  • Ручные процессы
+  • Отсутствие ESB
+  • Email-коммуникации
+end note
+
+legend right
+  |= Цвет |= Тип интеграции |
+  |<#green> Зеленый | Real-time |
+  |<#red> Красный | Batch (раз в день) |
+  |<#orange> Оранжевый | Ручная |
+endlegend
+
+@enduml

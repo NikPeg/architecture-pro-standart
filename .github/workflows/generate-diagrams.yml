@@ -1,0 +1,63 @@
+name: Generate PlantUML Diagrams
+
+on:
+  push:
+    paths:
+      - '**/*.puml'
+      - '.github/workflows/generate-diagrams.yml'
+  pull_request:
+    paths:
+      - '**/*.puml'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '11'
+
+    - name: Download PlantUML
+      run: |
+        wget -O plantuml.jar https://github.com/plantuml/plantuml/releases/download/v1.2024.3/plantuml-1.2024.3.jar
+
+    - name: Generate diagrams
+      run: |
+        # Find all .puml files and generate PNG and SVG
+        find . -name "*.puml" | while read puml_file; do
+          echo "Processing $puml_file"
+          # Generate PNG
+          java -jar plantuml.jar -tpng "$puml_file"
+          # Generate SVG
+          java -jar plantuml.jar -tsvg "$puml_file"
+        done
+
+    - name: Commit generated diagrams
+      if: github.event_name == 'push'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A "*.png" "*.svg"
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Auto-generate diagrams from PlantUML files"
+          git push
+        fi
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: diagrams
+        path: |
+          **/*.png
+          **/*.svg
+        retention-days: 30
