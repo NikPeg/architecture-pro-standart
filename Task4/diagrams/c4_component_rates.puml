@@ -1,0 +1,102 @@
+@startuml c4_component_rates
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Диаграмма компонентов - Rate Management & Distribution System
+
+Person(manager, "Менеджер", "Управляет ставками")
+Person(cc_operator, "Оператор", "Консультирует по ставкам")
+
+Container(abs_db, "АБС Database", "Oracle", "Хранилище ставок")
+Container(cc_system, "Call Center System", "React/Java", "Система кол-центра")
+Container(sftp_server, "SFTP Server", "OpenSSH", "Файловый сервер")
+Container_Ext(partner_system, "Partner System", "External", "Система партнера")
+ContainerQueue(rabbitmq, "RabbitMQ", "AMQP", "Очередь событий")
+
+Container_Boundary(rate_system, "Rate Management & Distribution System") {
+    Component(web_ui, "Web UI", "React", "Интерфейс управления ставками")
+    Component(api_controller, "API Controller", "Spring REST", "REST API endpoints")
+    Component(auth_service, "Auth Service", "Spring Security", "Аутентификация и авторизация")
+
+    Component(rate_manager, "Rate Manager", "Spring Service", "Бизнес-логика управления ставками")
+    Component(rate_calculator, "Rate Calculator", "Spring Service", "Расчет ставок на основе ЦБ")
+    Component(validation_service, "Validation Service", "Spring Service", "Валидация ставок")
+
+    Component(event_publisher, "Event Publisher", "Spring AMQP", "Публикация событий об изменениях")
+    Component(distribution_orchestrator, "Distribution Orchestrator", "Spring Service", "Координация распространения")
+
+    Component(api_client, "Internal API Client", "REST Client", "Клиент для внутренних систем")
+    Component(file_generator, "File Generator", "Spring Service", "Генерация CSV/JSON файлов")
+    Component(sftp_client, "SFTP Client", "JSch", "Клиент для загрузки файлов")
+
+    Component(scheduler, "Scheduler", "Spring Scheduler", "Планировщик задач")
+    Component(monitoring, "Monitoring Service", "Spring Actuator", "Мониторинг и health checks")
+    Component(audit_logger, "Audit Logger", "Logback", "Аудит всех операций")
+
+    ComponentDb(local_cache, "Local Cache", "Redis", "Кэш текущих ставок")
+}
+
+' Взаимодействия пользователей
+Rel(manager, web_ui, "Управляет ставками", "HTTPS")
+Rel(cc_operator, cc_system, "Просматривает ставки", "HTTPS")
+
+' Внутренние взаимодействия - UI слой
+Rel(web_ui, api_controller, "Вызывает API", "REST/JSON")
+Rel(api_controller, auth_service, "Проверяет доступ", "")
+Rel(api_controller, rate_manager, "Делегирует операции", "")
+
+' Бизнес-логика
+Rel(rate_manager, rate_calculator, "Рассчитывает ставки", "")
+Rel(rate_manager, validation_service, "Валидирует данные", "")
+Rel(rate_manager, local_cache, "Кэширует ставки", "Redis protocol")
+Rel(rate_manager, abs_db, "Сохраняет ставки", "JDBC")
+Rel(rate_manager, event_publisher, "Инициирует события", "")
+
+' Распространение ставок
+Rel(event_publisher, rabbitmq, "Публикует события", "AMQP")
+Rel(rabbitmq, distribution_orchestrator, "Получает события", "AMQP")
+Rel(distribution_orchestrator, api_client, "Отправляет в кол-центр", "")
+Rel(distribution_orchestrator, file_generator, "Запускает генерацию", "")
+
+' Интеграция с кол-центром
+Rel(api_client, cc_system, "Передает ставки", "REST API")
+Rel(cc_system, api_controller, "Запрашивает ставки", "REST API")
+
+' Интеграция с партнерами
+Rel(file_generator, local_cache, "Читает ставки", "Redis protocol")
+Rel(file_generator, sftp_client, "Передает файл", "")
+Rel(sftp_client, sftp_server, "Загружает файл", "SFTP/SSH")
+Rel(partner_system, sftp_server, "Скачивает файл", "SFTP/SSH")
+
+' Планировщик и мониторинг
+Rel(scheduler, distribution_orchestrator, "Запускает по расписанию", "")
+Rel(scheduler, monitoring, "Проверяет консистентность", "")
+Rel(monitoring, cc_system, "Проверяет ставки", "REST API")
+Rel(monitoring, sftp_server, "Проверяет доступность", "SSH")
+
+' Аудит
+Rel_U(rate_manager, audit_logger, "Логирует изменения", "")
+Rel_U(distribution_orchestrator, audit_logger, "Логирует передачу", "")
+Rel_U(sftp_client, audit_logger, "Логирует загрузки", "")
+
+note right of distribution_orchestrator
+  **Процесс распространения:**
+  1. Получение события об изменении
+  2. Определение получателей
+  3. Параллельная отправка:
+     - API для внутренних систем
+     - Файлы для партнеров
+  4. Подтверждение доставки
+  5. Логирование результата
+end note
+
+note bottom of file_generator
+  **Поддерживаемые форматы:**
+  • CSV - простой табличный
+  • JSON - структурированный
+  • Версионирование формата
+  • Сжатие при необходимости
+end note
+
+SHOW_LEGEND()
+
+@enduml

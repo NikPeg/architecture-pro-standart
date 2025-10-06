@@ -1,0 +1,94 @@
+@startuml c4_context_credit
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title Контекстная диаграмма - Система онлайн-заявок на кредит
+
+' Styling
+skinparam backgroundcolor #FEFEFE
+LAYOUT_WITH_LEGEND()
+
+' Actors/Persons
+Person(new_customer, "Новый клиент", "Потенциальный клиент банка, не имеющий счетов")
+Person(existing_customer, "Существующий клиент", "Клиент с открытыми счетами в банке")
+Person(branch_manager, "Менеджер отделения", "Сотрудник фронт-офиса, работает с клиентами")
+Person(credit_manager, "Менеджер кредитования", "Сотрудник бэк-офиса, обрабатывает заявки")
+Person(cc_operator, "Оператор кол-центра", "Консультирует клиентов по телефону")
+
+' Main Systems
+System(credit_system, "Credit System", "Система управления кредитными заявками онлайн")
+
+System(website, "Сайт банка", "Публичный сайт с информацией о кредитах")
+System(internet_bank, "Интернет-банк", "Личный кабинет клиента")
+
+' Core Banking Systems
+System(abs, "АБС", "Автоматизированная банковская система - ядро банка")
+System(credit_pipeline, "Кредитный конвейер", "Система обработки и одобрения кредитных заявок")
+System(scoring_system, "Система скоринга", "Оценка кредитоспособности клиентов")
+
+' Support Systems
+System(call_center, "Система кол-центра", "CRM для работы с обращениями")
+System(notification_service, "Сервис уведомлений", "Отправка СМС и email")
+
+' External Systems
+System_Ext(bki, "Бюро кредитных историй", "Внешний источник кредитной истории")
+System_Ext(cbr, "Центробанк РФ", "Регулятор, источник ключевой ставки")
+System_Ext(sms_gateway, "СМС-шлюз", "Внешний сервис отправки СМС")
+
+' Relationships - Customer interactions
+Rel(new_customer, website, "Подает заявку на кредит", "HTTPS")
+Rel(existing_customer, internet_bank, "Просматривает предодобренные предложения", "HTTPS")
+Rel(existing_customer, internet_bank, "Подает заявку на кредит", "HTTPS")
+
+' Relationships - Employee interactions
+Rel(branch_manager, abs, "Оформляет кредит в отделении", "Desktop App")
+Rel(credit_manager, credit_pipeline, "Обрабатывает заявки", "Web UI")
+Rel(cc_operator, call_center, "Консультирует по заявкам", "Web UI")
+
+' Relationships - System to System (Credit System)
+Rel(website, credit_system, "Передает заявки новых клиентов", "REST/HTTPS")
+Rel(internet_bank, credit_system, "Передает заявки существующих клиентов", "REST/HTTPS")
+Rel(credit_system, credit_pipeline, "Создает приоритетные заявки", "REST API")
+Rel(credit_system, scoring_system, "Запрашивает быстрый скоринг", "REST API")
+Rel(credit_system, abs, "Получает данные клиентов", "API")
+Rel(credit_system, notification_service, "Инициирует уведомления", "Events/AMQP")
+Rel(credit_system, call_center, "Передает заявки на обработку", "REST API")
+
+' Relationships - Credit Pipeline
+Rel(credit_pipeline, abs, "Синхронизирует данные", "Batch/Daily")
+Rel(credit_pipeline, scoring_system, "Запрашивает полный скоринг", "REST API")
+Rel(credit_pipeline, notification_service, "Отправляет статусы", "Events")
+
+' Relationships - Scoring System
+Rel(scoring_system, bki, "Запрашивает кредитную историю", "REST API")
+Rel(scoring_system, abs, "Получает данные о счетах", "Database")
+
+' Relationships - Other
+Rel(abs, cbr, "Получает ключевую ставку", "REST API")
+Rel(notification_service, sms_gateway, "Отправляет СМС", "REST API")
+Rel(call_center, credit_system, "Запрашивает информацию", "REST API")
+
+' Notes
+note right of credit_system
+  **Ключевые функции:**
+  • Прием онлайн-заявок
+  • Быстрый скоринг
+  • Предодобренные предложения
+  • Приоритетная обработка
+  • Real-time статусы
+end note
+
+note left of credit_pipeline
+  **Ограничения:**
+  • Batch-интеграция с АБС
+  • Обработка раз в сутки
+  • Legacy система
+end note
+
+note bottom of scoring_system
+  **Ограничения:**
+  • Max 100 запросов/мин
+  • Высокая нагрузка днем
+  • Критичная система
+end note
+
+@enduml

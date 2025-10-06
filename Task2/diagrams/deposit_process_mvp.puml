@@ -1,0 +1,155 @@
+@startuml deposit_process_mvp
+!theme plain
+title Процесс открытия депозита - MVP (TO-BE)
+skinparam backgroundColor #FEFEFE
+
+actor "Клиент" as CLIENT
+participant "Интернет-банк/\nСайт" as FRONTEND
+participant "API Gateway" as API_GW
+participant "Кэш\n(Redis)" as CACHE
+participant "Сервис\nдепозитов" as DEPOSIT_SVC
+participant "Сервис\nставок" as RATE_SVC
+participant "Очередь\nсообщений" as QUEUE
+participant "АБС" as ABS
+database "Oracle DB\n(АБС)" as ABS_DB
+participant "Менеджер\nбэк-офиса" as MANAGER
+participant "Сервис\nуведомлений" as NOTIFY_SVC
+participant "СМС-шлюз" as SMS
+
+== Просмотр предложений ==
+CLIENT -> FRONTEND: Запрос списка\nдепозитов
+activate FRONTEND
+FRONTEND -> API_GW: GET /deposits
+activate API_GW
+API_GW -> CACHE: Проверка кэша
+activate CACHE
+
+alt Данные в кэше актуальны
+    CACHE --> API_GW: Список депозитов\nи ставок
+    note right: Время отклика < 50ms
+else Кэш устарел
+    API_GW -> DEPOSIT_SVC: Запрос депозитов
+    activate DEPOSIT_SVC
+    DEPOSIT_SVC -> RATE_SVC: Запрос ставок
+    activate RATE_SVC
+    RATE_SVC -> ABS_DB: Чтение ставок
+    activate ABS_DB
+    ABS_DB --> RATE_SVC: Актуальные ставки
+    deactivate ABS_DB
+
+    alt Персонализированные ставки (для авторизованного клиента)
+        RATE_SVC -> RATE_SVC: Расчет\nперсональной ставки
+        note right: На основе:\n• Истории клиента\n• Суммы депозита\n• Кредитного риска
+    end
+
+    RATE_SVC --> DEPOSIT_SVC: Ставки
+    deactivate RATE_SVC
+    DEPOSIT_SVC --> API_GW: Список с ставками
+    deactivate DEPOSIT_SVC
+    API_GW -> CACHE: Обновление кэша
+    CACHE --> API_GW: OK
+end
+
+deactivate CACHE
+API_GW --> FRONTEND: Список депозитов
+deactivate API_GW
+FRONTEND --> CLIENT: Отображение\nпредложений
+deactivate FRONTEND
+
+== Подача заявки ==
+CLIENT -> FRONTEND: Заполнение заявки
+activate FRONTEND
+FRONTEND -> FRONTEND: Валидация данных
+
+alt Интернет-банк (существующий клиент)
+    FRONTEND -> API_GW: POST /deposits/apply\n(с СМС-кодом)
+else Сайт (новый клиент)
+    FRONTEND -> API_GW: POST /deposits/lead\n(ФИО + телефон)
+end
+
+activate API_GW
+API_GW -> DEPOSIT_SVC: Создание заявки
+activate DEPOSIT_SVC
+DEPOSIT_SVC -> ABS_DB: Сохранение заявки
+activate ABS_DB
+ABS_DB --> DEPOSIT_SVC: ID заявки
+deactivate ABS_DB
+
+DEPOSIT_SVC -> QUEUE: Событие:\n"Новая заявка"
+activate QUEUE
+QUEUE --> DEPOSIT_SVC: OK
+deactivate QUEUE
+
+DEPOSIT_SVC --> API_GW: Результат
+deactivate DEPOSIT_SVC
+API_GW --> FRONTEND: Подтверждение
+deactivate API_GW
+FRONTEND --> CLIENT: Заявка принята
+deactivate FRONTEND
+
+== Асинхронная обработка ==
+QUEUE -> NOTIFY_SVC: Событие заявки
+activate NOTIFY_SVC
+NOTIFY_SVC -> SMS: Отправка СМС\nклиенту
+activate SMS
+SMS --> CLIENT: СМС: "Заявка\nпринята"
+deactivate SMS
+deactivate NOTIFY_SVC
+
+alt Новый клиент
+    QUEUE -> CC_SYS: Событие для\nкол-центра
+    note right: Оператор свяжется\nс клиентом
+else Существующий клиент
+    QUEUE -> ABS: Уведомление\nо заявке
+    activate ABS
+    ABS -> MANAGER: Задача на\nобработку
+    deactivate ABS
+end
+
+== Обработка менеджером (MVP) ==
+MANAGER -> ABS: Открытие заявки
+activate MANAGER
+activate ABS
+ABS -> ABS_DB: Получение данных
+activate ABS_DB
+ABS_DB --> ABS: Данные заявки
+deactivate ABS_DB
+
+MANAGER -> MANAGER: Проверка и\nподтверждение
+MANAGER -> ABS: Одобрение депозита
+ABS -> ABS_DB: Создание депозита
+activate ABS_DB
+ABS_DB --> ABS: Депозит создан
+deactivate ABS_DB
+
+ABS -> QUEUE: Событие:\n"Депозит открыт"
+activate QUEUE
+QUEUE --> ABS: OK
+deactivate QUEUE
+deactivate ABS
+deactivate MANAGER
+
+== Финальное уведомление ==
+QUEUE -> NOTIFY_SVC: Событие открытия
+activate NOTIFY_SVC
+NOTIFY_SVC -> SMS: СМС клиенту
+activate SMS
+SMS --> CLIENT: СМС: "Депозит открыт\nСтавка: X%"
+deactivate SMS
+deactivate NOTIFY_SVC
+
+note bottom
+    **Улучшения в MVP:**
+    • Время отклика < 100ms (кэширование)
+    • Асинхронная обработка (очереди)
+    • Централизованное управление ставками
+    • Защита АБС от прямых запросов
+    • Event-driven уведомления
+
+    **Время обработки:**
+    • Отображение: < 2 сек
+    • Подача заявки: < 1 сек
+    • Обработка: 10-30 минут (ручная в MVP)
+end note
+
+@enduml

@@ -1,0 +1,72 @@
+@startgantt roadmap_mvp
+!theme plain
+title RoadMap MVP - Открытие депозитов онлайн (6 месяцев)
+skinparam backgroundColor #FEFEFE
+
+Project starts 2025-11-01
+saturday are closed
+sunday are closed
+
+-- Инфраструктура и подготовка --
+[INFRA-001: Подготовка окружений] as [INFRA1] starts 2025-11-01 and lasts 10 days
+[INFRA-002: CI/CD pipeline] as [INFRA2] starts 2025-11-01 and lasts 10 days
+[SFTP-001: Развертывание SFTP] as [SFTP1] starts 2025-11-01 and lasts 5 days
+[SFTP-002: Настройка безопасности] as [SFTP2] starts 2025-11-06 and lasts 5 days
+[MS-001: Развертывание инфраструктуры] as [MS1] starts 2025-11-01 and lasts 10 days
+
+-- АБС --
+[ABS-001: Rate Management Service] as [ABS1] starts 2025-11-01 and lasts 20 days
+[ABS-002: Оптимизация процедур] as [ABS2] starts 2025-11-06 and lasts 15 days
+[ABS-003: Интеграция с очередью] as [ABS3] starts 2025-11-21 and lasts 10 days
+[ABS-004: Аудит и логирование] as [ABS4] starts 2025-12-01 and lasts 5 days
+
+-- Микросервисы --
+[MS-002: Rate Distribution Service] as [MS2] starts 2025-11-11 and lasts 15 days
+[MS-003: Deposit Service] as [MS3] starts 2025-11-11 and lasts 20 days
+[MS-004: Integration Service] as [MS4] starts 2025-11-16 and lasts 15 days
+[MS-005: Notification Service] as [MS5] starts 2025-12-01 and lasts 10 days
+
+-- Система кол-центра --
+[CC-001: Интеграция с Rate Service] as [CC1] starts 2025-11-21 and lasts 10 days
+[CC-002: Доработка UI операторов] as [CC2] starts 2025-11-21 and lasts 10 days
+[CC-003: Интеграция с очередью] as [CC3] starts 2025-12-01 and lasts 5 days
+
+-- Партнерский кол-центр --
+[PARTNER-001: Настройка получения файлов] as [P1] starts 2025-11-26 and lasts 10 days
+[PARTNER-002: Обучение операторов] as [P2] starts 2025-12-06 and lasts 5 days
+
+-- Интернет-банк --
+[IB-001: Разработка UI депозитов] as [IB1] starts 2025-11-21 and lasts 15 days
+[IB-002: Интеграция с API Gateway] as [IB2] starts 2025-12-06 and lasts 10 days
+[IB-003: Оптимизация производительности] as [IB3] starts 2025-12-16 and lasts 10 days
+
+-- Сайт банка --
+[WEB-001: Раздел депозитов] as [WEB1] starts 2025-12-01 and lasts 15 days
+[WEB-002: Интеграция с API] as [WEB2] starts 2025-12-16 and lasts 5 days
+
+-- Тестирование --
+[QA-001: Функциональное тестирование] as [QA1] starts 2025-12-16 and lasts 15 days
+[QA-002: Нагрузочное тестирование] as [QA2] starts 2025-12-21 and lasts 10 days
+[QA-003: Интеграционное тестирование] as [QA3] starts 2025-12-31 and lasts 10 days
+
+-- Финальная подготовка --
+[INFRA-003: Multi-ЦОД конфигурация] as [INFRA3] starts 2026-01-01 and lasts 15 days
+[DOC-001: Техническая документация] as [DOC1] starts 2025-12-16 and lasts 10 days
+[DOC-002: Пользовательская документация] as [DOC2] starts 2025-12-26 and lasts 5 days
+[TRAIN-001: Обучение персонала] as [TRAIN1] starts 2026-01-10 and lasts 10 days
+
+-- Вехи проекта --
+[Milestone: Инфраструктура готова] happens 2025-11-11
+[Milestone: Rate Service запущен] happens 2025-11-21
+[Milestone: Микросервисы развернуты] happens 2025-12-01
+[Milestone: Интеграции завершены] happens 2025-12-16
+[Milestone: Тестирование завершено] happens 2026-01-10
+[Milestone: Production запуск] happens 2026-01-20
+
+-- Критический путь --
+[ABS1] is colored in Red
+[MS3] is colored in Red
+[IB2] is colored in Red
+[QA3] is colored in Red
+
+@endgantt

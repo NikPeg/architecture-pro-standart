@@ -1,0 +1,48 @@
+@startuml c4_context
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title Контекстная диаграмма - Система открытия депозитов онлайн (MVP)
+
+Person(new_customer, "Новый клиент", "Потенциальный клиент банка, желающий открыть депозит")
+Person(existing_customer, "Существующий клиент", "Клиент с действующим счетом в банке")
+Person(branch_employee, "Сотрудник отделения", "Проводит идентификацию новых клиентов")
+Person(backoffice, "Менеджер бэк-офиса", "Обрабатывает заявки на депозиты")
+Person(cc_operator, "Оператор кол-центра", "Обрабатывает заявки с сайта")
+
+System_Boundary(bank_boundary, "Банк Стандарт") {
+    System(deposit_system, "Система управления депозитами", "Обработка заявок на депозиты, управление ставками, открытие депозитных счетов")
+    System(website, "Сайт банка", "Публичный сайт с информацией о депозитах")
+    System(internet_bank, "Интернет-банк", "Личный кабинет клиента")
+    System(abs, "АБС", "Автоматизированная банковская система")
+    System(cc_system, "Система кол-центра", "CRM для обработки обращений")
+}
+
+System_Ext(sms_gateway, "СМС-шлюз", "Телеком-оператор для отправки СМС")
+System_Ext(cbr, "Центральный банк", "Предоставляет ключевую ставку")
+System_Ext(credit_bureau, "Бюро кредитных историй", "Кредитная история клиентов")
+
+' Взаимодействия новых клиентов
+Rel(new_customer, website, "Просматривает депозиты, подает заявку", "HTTPS")
+Rel(new_customer, branch_employee, "Проходит идентификацию")
+
+' Взаимодействия существующих клиентов
+Rel(existing_customer, internet_bank, "Открывает депозит онлайн", "HTTPS")
+Rel(existing_customer, sms_gateway, "Получает СМС-коды и уведомления")
+
+' Взаимодействия сотрудников
+Rel(branch_employee, abs, "Завершает идентификацию")
+Rel(backoffice, deposit_system, "Обрабатывает заявки, управляет ставками")
+Rel(cc_operator, cc_system, "Работает с заявками клиентов")
+
+' Системные взаимодействия
+Rel(website, deposit_system, "Передает заявки")
+Rel(internet_bank, deposit_system, "Создает заявки на депозиты")
+Rel(deposit_system, abs, "Создает депозитные счета", "Async/Queue")
+Rel(deposit_system, cc_system, "Передает заявки с сайта")
+Rel(deposit_system, sms_gateway, "Отправляет уведомления", "API")
+Rel(deposit_system, cbr, "Получает ключевую ставку", "API")
+Rel(abs, credit_bureau, "Проверяет кредитную историю", "API")
+
+SHOW_LEGEND()
+
+@enduml

@@ -1,0 +1,117 @@
+@startuml c4_container
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Диаграмма контейнеров - Система открытия депозитов онлайн (MVP)
+
+Person(customer, "Клиент", "Существующий клиент банка")
+Person(new_customer, "Новый клиент", "Потенциальный клиент")
+Person(backoffice, "Менеджер бэк-офиса", "Обрабатывает заявки")
+Person(cc_operator, "Оператор кол-центра", "Работает с заявками")
+
+System_Ext(sms_gateway, "СМС-шлюз", "Отправка СМС")
+System_Ext(cbr_api, "API ЦБ РФ", "Ключевая ставка")
+
+System_Boundary(website_boundary, "Сайт банка") {
+    Container(web_frontend, "Web Frontend", "PHP, React.js", "Публичный сайт банка")
+    Container(web_backend, "Web Backend", "PHP", "API для сайта")
+}
+
+System_Boundary(internet_bank_boundary, "Интернет-банк") {
+    Container(ib_web, "Web Application", "ASP.NET MVC 4.5", "Веб-интерфейс интернет-банка")
+    Container(ib_api, "API Layer", ".NET Framework 4.5", "REST API для клиентских приложений")
+    Container(ib_auth, "Authentication Service", ".NET", "Сервис аутентификации и авторизации")
+    Container(ib_sms, "SMS Service", ".NET", "Интеграция с СМС-шлюзом")
+    ContainerDb(ib_db, "Database", "MS SQL", "Данные сессий и кэш")
+}
+
+System_Boundary(deposit_system_boundary, "Система управления депозитами") {
+    Container(api_gateway, "API Gateway", "Kong/nginx", "Единая точка входа, rate limiting, балансировка")
+    Container(deposit_service, "Deposit Service", "Java Spring Boot", "Бизнес-логика депозитов")
+    Container(rate_service, "Rate Management Service", "PL/SQL in ABS", "Управление ставками")
+    Container(notification_service, "Notification Service", "Java", "Сервис уведомлений")
+    Container(integration_service, "ABS Integration Service", "C#/.NET", "Адаптер для работы с АБС")
+    ContainerDb(redis_cache, "Cache", "Redis Cluster", "Кэш ставок и справочников")
+    ContainerQueue(rabbitmq, "Message Queue", "RabbitMQ", "Асинхронная обработка")
+}
+
+System_Boundary(abs_boundary, "АБС (Автоматизированная банковская система)") {
+    Container(abs_core, "Core Banking", "Delphi", "Ядро банковской системы")
+    Container(abs_deposits, "Deposit Module", "PL/SQL", "Модуль депозитов")
+    Container(abs_accounts, "Account Module", "PL/SQL", "Управление счетами")
+    Container(abs_customers, "Customer Module", "PL/SQL", "Данные клиентов")
+    Container(abs_rates, "Rate Calculator", "PL/SQL", "Расчет и хранение ставок")
+    ContainerDb(abs_db, "Oracle Database", "Oracle 19c", "Основная БД банка")
+}
+
+System_Boundary(cc_system_boundary, "Система кол-центра") {
+    Container(cc_frontend, "Web UI", "React.js", "Интерфейс оператора")
+    Container(cc_backend, "Backend", "Java Spring Boot", "Бизнес-логика")
+    ContainerDb(cc_db, "Database", "PostgreSQL", "База заявок")
+}
+
+System_Boundary(monitoring_boundary, "Мониторинг и логирование") {
+    Container(elk, "ELK Stack", "Elasticsearch, Logstash, Kibana", "Централизованное логирование")
+    Container(prometheus, "Prometheus", "Prometheus, Grafana", "Метрики и алерты")
+}
+
+' Взаимодействия клиентов
+Rel(customer, ib_web, "Использует", "HTTPS")
+Rel(new_customer, web_frontend, "Просматривает депозиты", "HTTPS")
+
+' Взаимодействия сотрудников
+Rel(backoffice, abs_core, "Обрабатывает заявки", "Desktop client")
+Rel(cc_operator, cc_frontend, "Работает с заявками", "HTTPS")
+
+' Интернет-банк внутренние связи
+Rel(ib_web, ib_api, "Использует", "HTTPS")
+Rel(ib_api, ib_auth, "Проверяет доступ", "In-process")
+Rel(ib_api, ib_sms, "Запрашивает СМС", "In-process")
+Rel(ib_sms, sms_gateway, "Отправляет СМС", "REST API")
+Rel(ib_api, ib_db, "Читает/пишет", "ADO.NET")
+
+' Интеграции через API Gateway
+Rel(ib_api, api_gateway, "Создает заявки", "REST/JSON")
+Rel(web_backend, api_gateway, "Передает заявки", "REST/JSON")
+
+' API Gateway маршрутизация
+Rel(api_gateway, deposit_service, "Маршрутизирует", "HTTP")
+Rel(api_gateway, redis_cache, "Кэширует", "Redis protocol")
+
+' Deposit Service взаимодействия
+Rel(deposit_service, rate_service, "Запрашивает ставки", "Internal API")
+Rel(deposit_service, rabbitmq, "Публикует события", "AMQP")
+Rel(deposit_service, redis_cache, "Кэширует данные", "Redis protocol")
+
+' Асинхронная обработка
+Rel(rabbitmq, notification_service, "Доставляет события", "AMQP")
+Rel(rabbitmq, integration_service, "Доставляет команды", "AMQP")
+Rel(rabbitmq, cc_backend, "Передает заявки", "AMQP")
+
+' Интеграция с АБС
+Rel(integration_service, abs_core, "Вызывает процедуры", "Oracle Net")
+Rel(rate_service, abs_rates, "Управляет ставками", "PL/SQL")
+
+' АБС внутренние связи
+Rel(abs_core, abs_db, "Читает/пишет", "Oracle Net")
+Rel(abs_deposits, abs_db, "Читает/пишет", "PL/SQL")
+Rel(abs_accounts, abs_db, "Читает/пишет", "PL/SQL")
+Rel(abs_customers, abs_db, "Читает/пишет", "PL/SQL")
+Rel(abs_rates, abs_db, "Читает/пишет", "PL/SQL")
+Rel(abs_rates, cbr_api, "Получает ставку ЦБ", "REST API")
+
+' Уведомления
+Rel(notification_service, sms_gateway, "Отправляет СМС", "REST API")
+
+' Система кол-центра
+Rel(cc_frontend, cc_backend, "Использует", "REST/JSON")
+Rel(cc_backend, cc_db, "Читает/пишет", "JDBC")
+
+' Мониторинг
+Rel_U(deposit_service, elk, "Логи", "Syslog")
+Rel_U(api_gateway, elk, "Логи", "Syslog")
+Rel_U(deposit_service, prometheus, "Метрики", "HTTP")
+Rel_U(api_gateway, prometheus, "Метрики", "HTTP")
+
+SHOW_LEGEND()
+
+@enduml

@@ -1,0 +1,136 @@
+@startuml c4_container_credit
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Диаграмма контейнеров - Система онлайн-заявок на кредит
+
+' Styling
+skinparam backgroundcolor #FEFEFE
+LAYOUT_WITH_LEGEND()
+
+' External actors
+Person(new_customer, "Новый клиент", "Потенциальный клиент")
+Person(existing_customer, "Существующий клиент", "Клиент банка")
+Person(credit_manager, "Менеджер кредитования", "Обрабатывает заявки")
+
+' External systems
+System_Ext(bki, "БКИ", "Бюро кредитных историй")
+System_Ext(sms_gateway, "СМС-шлюз", "Отправка СМС")
+
+' Frontend systems
+System_Boundary(frontend_boundary, "Frontend") {
+    Container(website, "Сайт банка", "PHP, React.js", "Публичный сайт")
+    Container(internet_bank, "Интернет-банк", "ASP.NET MVC 4.5", "Личный кабинет")
+}
+
+' Existing MVP Infrastructure (reused)
+System_Boundary(mvp_infrastructure, "MVP Infrastructure (Existing)") {
+    Container(api_gateway, "API Gateway", "Kong/nginx", "Маршрутизация, rate limiting, авторизация")
+    ContainerDb(redis_cache, "Redis Cache", "Redis Cluster", "Кэш предодобренных предложений и скоринга")
+    ContainerQueue(rabbitmq, "Message Queue", "RabbitMQ", "Асинхронные события")
+    Container(notification_service, "Notification Service", "Java Spring Boot", "Сервис уведомлений")
+}
+
+' Credit System components
+System_Boundary(credit_boundary, "Credit System") {
+    Container(credit_app_service, "Credit Application Service", "Java Spring Boot", "Управление кредитными заявками")
+    Container(preapproval_service, "Pre-approval Service", "Python/Java", "Расчет предодобренных предложений")
+    Container(quick_scoring, "Quick Scoring Adapter", "Java Spring Boot", "Быстрый скоринг по БКИ")
+    Container(credit_gateway, "Credit Pipeline Gateway", "Java Spring Boot", "Интеграция с Кредитным конвейером")
+    ContainerDb(credit_db, "Credit Database", "PostgreSQL", "Хранение заявок и предложений")
+}
+
+' Core Banking Systems
+System_Boundary(banking_boundary, "Core Banking") {
+    Container(abs, "АБС", "Delphi/Oracle", "Банковская система")
+    ContainerDb(abs_db, "АБС Database", "Oracle", "Данные клиентов и счетов")
+    Container(credit_pipeline, "Кредитный конвейер", "Camunda/Java", "Обработка кредитов")
+    ContainerDb(pipeline_db, "Pipeline Database", "Oracle", "Данные по кредитам")
+    Container(scoring_system, "Система скоринга", "Python/Flask", "Полный скоринг")
+}
+
+' Customer interactions
+Rel(new_customer, website, "Подает заявку", "HTTPS")
+Rel(existing_customer, internet_bank, "Использует предодобрение", "HTTPS")
+
+' Frontend to API Gateway
+Rel(website, api_gateway, "Передает заявку", "REST/JSON")
+Rel(internet_bank, api_gateway, "Запрашивает предодобрения", "REST/JSON")
+
+' API Gateway routing
+Rel(api_gateway, credit_app_service, "Маршрутизирует запросы", "HTTP/REST")
+Rel(api_gateway, redis_cache, "Кэширует данные", "Redis protocol")
+
+' Credit Application Service interactions
+Rel(credit_app_service, credit_db, "Сохраняет заявки", "JDBC")
+Rel(credit_app_service, rabbitmq, "Публикует события", "AMQP")
+Rel(credit_app_service, redis_cache, "Читает предодобрения", "Redis protocol")
+Rel(credit_app_service, quick_scoring, "Запрашивает быстрый скоринг", "REST")
+Rel(credit_app_service, credit_gateway, "Передает в конвейер", "REST")
+
+' Pre-approval Service interactions
+Rel(preapproval_service, scoring_system, "Запрашивает скоринг", "REST API")
+Rel(preapproval_service, abs_db, "Читает данные клиентов", "JDBC")
+Rel(preapproval_service, redis_cache, "Сохраняет предложения", "Redis protocol")
+Rel(preapproval_service, credit_db, "Сохраняет историю", "JDBC")
+
+' Quick Scoring interactions
+Rel(quick_scoring, bki, "Запрашивает кредитную историю", "REST API")
+Rel(quick_scoring, redis_cache, "Кэширует результаты", "Redis protocol")
+
+' Credit Pipeline Gateway
+Rel(credit_gateway, credit_pipeline, "Создает заявки", "REST API")
+Rel(credit_gateway, rabbitmq, "Слушает события", "AMQP")
+Rel_L(credit_pipeline, pipeline_db, "Работает", "JDBC")
+
+' Batch processes (existing)
+Rel(abs_db, pipeline_db, "Batch sync", "Daily ETL", $tags="batch")
+Rel(pipeline_db, abs_db, "Batch sync", "Daily ETL", $tags="batch")
+
+' Event-driven notifications
+Rel(rabbitmq, notification_service, "Доставляет события", "AMQP")
+Rel(notification_service, sms_gateway, "Отправляет СМС", "REST API")
+
+' Credit manager interaction
+Rel(credit_manager, credit_pipeline, "Обрабатывает заявки", "Web UI")
+
+' Scoring system interactions
+Rel(scoring_system, abs_db, "Читает данные", "JDBC")
+Rel(scoring_system, bki, "Запрашивает историю", "REST API")
+
+' Notes
+note right of credit_app_service
+  **Основные функции:**
+  • Прием заявок
+  • Валидация данных
+  • Управление статусами
+  • Приоритизация
+  • Event publishing
+end note
+
+note right of preapproval_service
+  **Работает по расписанию:**
+  • Ночной расчет
+  • Batch по 1000 клиентов
+  • TTL предложений 30 дней
+  • Персонализация условий
+end note
+
+note bottom of quick_scoring
+  **Ограничения:**
+  • Упрощенная модель
+  • Только данные БКИ
+  • Кэш на 24 часа
+  • Rate limit 100/min
+end note
+
+note left of credit_gateway
+  **Обход batch:**
+  • Real-time API
+  • Priority queue
+  • Fallback to batch
+  • Status sync
+end note
+
+SHOW_LEGEND()
+
+@enduml

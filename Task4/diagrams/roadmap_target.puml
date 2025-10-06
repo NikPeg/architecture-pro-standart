@@ -1,0 +1,64 @@
+@startgantt roadmap_target
+!theme plain
+title RoadMap - Целевая архитектура (12 месяцев)
+skinparam backgroundColor #FEFEFE
+
+Project starts 2025-11-01
+saturday are closed
+sunday are closed
+
+-- Q1: MVP Депозиты (Месяцы 1-3) --
+[MVP: Депозиты онлайн] as [MVP1] starts 2025-11-01 and lasts 60 days
+[MVP: Интеграция кол-центров] as [MVP2] starts 2025-11-15 and lasts 45 days
+[Пилотный запуск депозитов] as [PILOT1] starts 2026-01-01 and lasts 10 days
+
+-- Q2: Расширение и стабилизация (Месяцы 4-6) --
+[Полная автоматизация депозитов] as [AUTO1] starts 2026-01-11 and lasts 30 days
+[Внедрение ML для персонализации] as [ML1] starts 2026-01-21 and lasts 25 days
+[Миграция на Kafka] as [KAFKA] starts 2026-02-10 and lasts 20 days
+[Оптимизация производительности] as [OPT1] starts 2026-02-10 and lasts 15 days
+
+-- Q3: Кредитные продукты (Месяцы 7-9) --
+[Разработка Credit Service] as [CREDIT1] starts 2026-03-01 and lasts 30 days
+[Интеграция с системой скоринга] as [SCORE1] starts 2026-03-11 and lasts 20 days
+[Предодобренные предложения] as [PREAPP] starts 2026-03-31 and lasts 15 days
+[Подача заявок на кредит онлайн] as [CREDIT2] starts 2026-03-31 and lasts 20 days
+[Пилот кредитов] as [PILOT2] starts 2026-04-20 and lasts 10 days
+
+-- Q4: Масштабирование и новые продукты (Месяцы 10-12) --
+[Мобильное приложение] as [MOBILE] starts 2026-05-01 and lasts 40 days
+[Open Banking API] as [OPENAPI] starts 2026-05-11 and lasts 30 days
+[Инвестиционные продукты] as [INVEST] starts 2026-05-21 and lasts 25 days
+[Marketplace интеграция] as [MARKET] starts 2026-05-21 and lasts 20 days
+
+-- Инфраструктурные проекты --
+[Kubernetes миграция] as [K8S] starts 2026-03-01 and lasts 40 days
+[Service Mesh внедрение] as [MESH] starts 2026-04-10 and lasts 30 days
+[Disaster Recovery улучшение] as [DR] starts 2026-04-10 and lasts 25 days
+[Security hardening] as [SEC] starts 2026-04-10 and lasts 20 days
+
+-- Организационные изменения --
+[Создание DevOps команды] as [DEVOPS] starts 2025-12-01 and lasts 20 days
+[Agile трансформация] as [AGILE] starts at [DEVOPS]'s end and lasts 30 days
+[Центр компетенций микросервисов] as [COE] starts at [AGILE]'s end and lasts 25 days
+[Data Governance внедрение] as [DATA] starts at [COE]'s end and lasts 30 days
+
+-- Ключевые вехи --
+[Milestone: MVP Депозиты запущен] happens 2026-01-11
+[Milestone: Полная автоматизация] happens 2026-02-10
+[Milestone: Kafka в production] happens 2026-03-01
+[Milestone: Кредиты онлайн] happens 2026-04-30
+[Milestone: Мобильное приложение] happens 2026-06-10
+[Milestone: Целевая архитектура] happens 2026-06-10
+
+-- Фазы проекта --
+[MVP1] is colored in LightGreen
+[MVP2] is colored in LightGreen
+[AUTO1] is colored in Yellow
+[CREDIT1] is colored in Orange
+[CREDIT2] is colored in Orange
+[MOBILE] is colored in LightBlue
+[K8S] is colored in Red
+[KAFKA] is colored in Red
+
+@endgantt

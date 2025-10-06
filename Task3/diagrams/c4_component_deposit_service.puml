@@ -1,0 +1,84 @@
+@startuml c4_component_deposit
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Диаграмма компонентов - Deposit Service (Сервис депозитов)
+
+Person(customer, "Клиент", "Использует интернет-банк")
+Person(backoffice, "Менеджер", "Обрабатывает заявки")
+
+Container(api_gateway, "API Gateway", "Kong", "Маршрутизация, авторизация")
+Container(rate_service, "Rate Service", "PL/SQL", "Управление ставками")
+Container(integration_service, "ABS Integration", "C#", "Адаптер АБС")
+ContainerDb(redis, "Redis Cache", "Redis", "Кэш данных")
+ContainerQueue(rabbitmq, "RabbitMQ", "AMQP", "Очередь сообщений")
+
+Container_Boundary(deposit_service, "Deposit Service") {
+    Component(api_controller, "REST API Controller", "Spring REST", "Обработка HTTP запросов")
+    Component(auth_filter, "Authentication Filter", "Spring Security", "Проверка JWT токенов")
+    Component(validation, "Validation Component", "Bean Validation", "Валидация входных данных")
+
+    Component(deposit_facade, "Deposit Facade", "Spring Service", "Orchestration layer")
+    Component(product_service, "Product Service", "Spring Service", "Управление депозитными продуктами")
+    Component(application_service, "Application Service", "Spring Service", "Обработка заявок")
+    Component(rate_calculator, "Rate Calculator", "Spring Service", "Расчет персональных ставок")
+    Component(customer_service, "Customer Service", "Spring Service", "Работа с данными клиентов")
+
+    Component(cache_manager, "Cache Manager", "Spring Cache", "Управление кэшированием")
+    Component(event_publisher, "Event Publisher", "Spring AMQP", "Публикация событий")
+    Component(rate_client, "Rate Service Client", "Feign Client", "Интеграция с сервисом ставок")
+    Component(abs_client, "ABS Integration Client", "Feign Client", "Интеграция с АБС")
+
+    ComponentDb(local_db, "Local Database", "H2/PostgreSQL", "Локальное хранилище заявок")
+}
+
+' Внешние взаимодействия
+Rel(customer, api_gateway, "Запросы", "HTTPS")
+Rel(api_gateway, api_controller, "Маршрутизирует", "HTTP")
+
+' Внутренние взаимодействия - API слой
+Rel(api_controller, auth_filter, "Проверяет токен", "")
+Rel(api_controller, validation, "Валидирует", "")
+Rel(api_controller, deposit_facade, "Делегирует", "")
+
+' Бизнес-логика
+Rel(deposit_facade, product_service, "Получает продукты", "")
+Rel(deposit_facade, application_service, "Создает заявки", "")
+Rel(deposit_facade, rate_calculator, "Рассчитывает ставки", "")
+Rel(deposit_facade, customer_service, "Получает данные клиента", "")
+
+' Сервисы и их зависимости
+Rel(product_service, cache_manager, "Кэширует продукты", "")
+Rel(application_service, local_db, "Сохраняет заявки", "JDBC")
+Rel(application_service, event_publisher, "Публикует события", "")
+Rel(rate_calculator, rate_client, "Запрашивает базовые ставки", "")
+Rel(customer_service, abs_client, "Получает данные клиента", "")
+
+' Интеграционный слой
+Rel(cache_manager, redis, "Читает/пишет", "Redis protocol")
+Rel(event_publisher, rabbitmq, "Публикует", "AMQP")
+Rel(rate_client, rate_service, "Вызывает", "REST")
+Rel(abs_client, integration_service, "Вызывает", "REST")
+
+' Обратная связь
+Rel(backoffice, api_controller, "Управляет заявками", "HTTPS")
+
+note right of deposit_facade
+  **Основные операции:**
+  • Получение списка депозитов
+  • Расчет персональной ставки
+  • Создание заявки на депозит
+  • Проверка статуса заявки
+  • Подтверждение открытия
+end note
+
+note bottom of local_db
+  **Локальное хранилище:**
+  • Заявки в обработке
+  • История операций
+  • Аудит лог
+  • Временные данные
+end note
+
+SHOW_LEGEND()
+
+@enduml
